@@ -17,15 +17,19 @@ package me.nicolaferraro.cluster;
 
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import io.fabric8.kubernetes.api.model.v2_2.Pod;
+import io.fabric8.kubernetes.clnt.v2_2.KubernetesClient;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.impl.DefaultCamelContext;
 import org.apache.camel.model.dataformat.JsonLibrary;
-import org.apache.camel.util.jsse.SSLContextClientParameters;
 import org.arquillian.cube.kubernetes.annotations.Named;
 import org.arquillian.cube.kubernetes.annotations.PortForward;
 import org.jboss.arquillian.junit.Arquillian;
@@ -35,6 +39,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -44,12 +49,19 @@ import static org.junit.Assert.assertTrue;
 @RunWith(Arquillian.class)
 public class LeaderKT {
 
-    private static final Long MIN_SWITCH_TIME = 20000L;
+    private static final long INITIAL_DELAY = 20000L;
+    private static final long KILL_TIME_AVG = 18000L;
+    private static final long KILL_TIME_DEV = 5000L;
+    private static final long MAX_RUN_TIME = 300000L;
+    private static final double FORCEFUL_KILL_PROB = 0.35;
 
     @ArquillianResource
     @Named("tests")
     @PortForward
     private URL service;
+
+    @ArquillianResource
+    private KubernetesClient client;
 
     private CamelContext context;
 
@@ -64,6 +76,9 @@ public class LeaderKT {
                         .setHeader(Exchange.ACCEPT_CONTENT_TYPE, constant("application/json"))
                         .toF("http4://%s:%s/camel/leaders?bridgeEndpoint=true&connectionClose=true", service.getHost(), service.getPort())
                         .unmarshal().json(JsonLibrary.Jackson, LeaderStore.Leaders.class);
+
+                from("direct:killOne")
+                        .toF("http4://%s:%s/camel/kill?bridgeEndpoint=true&connectionClose=true", "leader-app-test.127.0.0.1.nip.io", 80);
 
             }
         }.addRoutesToCamelContext(context);
@@ -83,8 +98,44 @@ public class LeaderKT {
 
         long start = System.currentTimeMillis();
 
-        // Here you should kill pods randomly...
-        Thread.sleep(45000);
+        Thread.sleep(INITIAL_DELAY);
+        while (true) {
+            long time = System.currentTimeMillis();
+            long nextEvent = time + KILL_TIME_AVG - KILL_TIME_DEV + (long)(Math.random() * 2 * KILL_TIME_DEV);
+            long deadline = start + MAX_RUN_TIME;
+            if (nextEvent > deadline) {
+                long delay = deadline - time;
+                if (delay > 0) {
+                    System.out.println("Waiting " + (delay/1000) + " seconds before shutdown...");
+                    Thread.sleep(delay);
+                }
+                System.out.println("Shutdown...");
+                break;
+            }
+
+            System.out.println("Killing next pod in " + ((nextEvent - time) / 1000) + " seconds...");
+
+            Thread.sleep(nextEvent - time);
+            boolean gracefulKill = Math.random() >= FORCEFUL_KILL_PROB;
+
+            if (gracefulKill) {
+                System.out.println("Doing pod graceful delete");
+
+                List<Pod> pods = client.pods().withLabel("deploymentconfig", "leader-app").list().getItems();
+                assertTrue("No pods to kill found", pods.size() > 0);
+                int pos = (int)(Math.random() * pods.size());
+                String podName = pods.get(pos).getMetadata().getName();
+                System.out.println("Bye " + podName + "...");
+                client.pods().inNamespace("test").withName(podName).delete();
+            } else {
+                System.out.println("Killing brutally a pod");
+                try {
+                    context.createProducerTemplate().sendBody("direct:killOne", null);
+                } catch (Exception e) {
+                    System.out.println("Killed! (should not respond)");
+                }
+            }
+        }
 
 
 
@@ -93,23 +144,24 @@ public class LeaderKT {
         // Verification
         LeaderStore.Leaders leaders = context.createProducerTemplate().requestBody("direct:leaders", null, LeaderStore.Leaders.class);
         List<LeaderStore.Leader> leaderList = new ArrayList<>(leaders.getLeaders());
-        Collections.sort(leaderList, (l1, l2) -> l1.getTimestamp().compareTo(l2.getTimestamp()));
 
         long totalDuration = end - start;
         int minEvents = (int)(0.5 * (totalDuration/1000)); // at least one every 2 seconds
 
         assertTrue("Found " + leaderList.size() + " events, required (minimum) " + minEvents, leaderList.size() > minEvents);
 
-        for (int i=0; i<leaderList.size() - 1; i++) {
-            LeaderStore.Leader prev = leaderList.get(i);
-            LeaderStore.Leader curr = leaderList.get(i + 1);
+        Set<String> leaderSet = leaderList.stream().map(LeaderStore.Leader::getLeader).collect(Collectors.toSet());
 
-            if (curr.getLeader().equals(prev.getLeader())) {
-                continue;
-            }
+        assertTrue("No leaders collected", leaderSet.size() > 0);
+        System.out.println("Number of leaders: " + leaderSet.size());
 
-            long delay = curr.getTimestamp() - prev.getTimestamp();
-            assertTrue("Two leaders may be concurrently active (" + curr.getLeader() + " and " + prev.getLeader() + "). Delay: " + delay, delay > MIN_SWITCH_TIME);
+        for (String leader : leaderSet) {
+            long min = leaderList.stream().filter(l -> l.getLeader().equals(leader)).map(LeaderStore.Leader::getTimestamp).min(Comparator.naturalOrder()).get();
+            long max = leaderList.stream().filter(l -> l.getLeader().equals(leader)).map(LeaderStore.Leader::getTimestamp).max(Comparator.naturalOrder()).get();
+
+            Set<String> intersectingLeaders = leaderList.stream().filter(l -> l.getTimestamp() >= min && l.getTimestamp() <= max).map(LeaderStore.Leader::getLeader).collect(Collectors.toSet());
+            assertEquals("More than one leader present in a period: " + leaderList, 1, intersectingLeaders.size());
+            assertEquals(leader, intersectingLeaders.iterator().next());
         }
 
     }
