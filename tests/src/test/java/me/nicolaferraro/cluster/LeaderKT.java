@@ -146,7 +146,7 @@ public class LeaderKT {
         List<LeaderStore.Leader> leaderList = new ArrayList<>(leaders.getLeaders());
 
         long totalDuration = end - start;
-        int minEvents = (int)(0.5 * (totalDuration/1000)); // at least one every 2 seconds
+        int minEvents = (int)(0.33 * (totalDuration/1000)); // at least one every 3 seconds
 
         assertTrue("Found " + leaderList.size() + " events, required (minimum) " + minEvents, leaderList.size() > minEvents);
 
