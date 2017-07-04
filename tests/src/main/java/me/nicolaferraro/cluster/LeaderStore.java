@@ -32,6 +32,10 @@ public class LeaderStore {
     public Queue<Leader> leaders;
 
     public LeaderStore() {
+        reset();
+    }
+
+    public void reset() {
         this.leaders = new ConcurrentLinkedQueue<>();
     }
 
@@ -42,6 +46,8 @@ public class LeaderStore {
     public Leaders getLeaderHistory() {
         return new Leaders(new LinkedList<>(leaders));
     }
+
+
 
     public static class Leaders {
         private List<Leader> leaders = new LinkedList<>();

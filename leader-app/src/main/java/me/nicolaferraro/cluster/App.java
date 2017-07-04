@@ -45,10 +45,21 @@ public class App extends RouteBuilder {
 
     public void configure() throws Exception {
 
-        KubernetesClusterService kubernetes = new KubernetesClusterService();
-        kubernetes.setMasterUrl("https://" + System.getenv("KUBERNETES_SERVICE_HOST") + ":" + System.getenv("KUBERNETES_SERVICE_PORT"));
-        kubernetes.setConfigMapName("leaders");
-        kubernetes.setKubernetesNamespace("test");
+        String mode = System.getenv("MODE");
+        if (mode == null) {
+            mode = "DEFAULT";
+        }
+
+        KubernetesClusterService kubernetes;
+        if (mode.equals("DEFAULT")) {
+            kubernetes = new KubernetesClusterService();
+        } else if (mode.equals("RECREATING")) {
+            kubernetes = new KubernetesClusterService();
+            kubernetes.setWatchRefreshIntervalSeconds(20L);
+        } else {
+            throw new IllegalStateException("Unsupported mode: " + mode);
+        }
+
         getContext().addService(kubernetes);
 
 

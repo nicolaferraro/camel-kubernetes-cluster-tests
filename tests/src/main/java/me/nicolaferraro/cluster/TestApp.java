@@ -51,5 +51,12 @@ public class TestApp extends RouteBuilder {
                 .bean("leaderStore", "getLeaderHistory")
                 .marshal().json(JsonLibrary.Jackson);
 
+        rest().post("/reset")
+                .consumes("text/plain")
+                .produces("text/plain")
+                .route()
+                .bean("leaderStore", "reset")
+                .log("Store resetted");
+
     }
 }
