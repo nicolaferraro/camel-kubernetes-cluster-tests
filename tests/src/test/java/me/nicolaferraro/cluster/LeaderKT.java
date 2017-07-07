@@ -27,9 +27,9 @@ import org.junit.runner.RunWith;
 public class LeaderKT extends KubernetesTestBase {
 
     private static final long INITIAL_DELAY = 20000L;
-    private static final long KILL_TIME_AVG = 18000L;
+    private static final long KILL_TIME_AVG = 30000L;
     private static final long KILL_TIME_DEV = 5000L;
-    private static final long MAX_RUN_TIME = 300000L;
+    private static final long MAX_RUN_TIME = 600000L;
     private static final double FORCEFUL_KILL_PROB = 0.35;
 
 
