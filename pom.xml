@@ -25,7 +25,7 @@
         <junit.version>4.12</junit.version>
 
         <!-- maven plugin versions -->
-        <fabric8.maven.plugin.version>3.4.1</fabric8.maven.plugin.version>
+        <fabric8.maven.plugin.version>3.3.5</fabric8.maven.plugin.version>
         <maven-surefire-plugin.version>2.19.1</maven-surefire-plugin.version>
     </properties>
 

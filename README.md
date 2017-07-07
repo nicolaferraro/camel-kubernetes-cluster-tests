@@ -11,7 +11,8 @@ keep one and only one active route in all pods of the cluster.
 mvn clean install -DskipTests
 ```
 
-2. Build Camel from [here]() 
+2. Build Camel from [here (v2, without lease)](https://github.com/nicolaferraro/camel/tree/CAMEL-11331-v2)
+or [here (v3, using lease)](https://github.com/nicolaferraro/camel/tree/CAMEL-11331-v3)
 
 ```
 mvn clean install -P fastinstall

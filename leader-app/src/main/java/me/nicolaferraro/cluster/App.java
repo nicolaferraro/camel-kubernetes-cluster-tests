@@ -34,11 +34,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class App extends RouteBuilder {
 
     public static void main(String[] args) {
-        String testsSystem = System.getenv("TESTS_SERVICE_HOST");
-        if (testsSystem == null) {
-            System.out.println("Test system not available. Restarting");
-            System.exit(1);
-        }
+//        String testsSystem = System.getenv("TESTS_SERVICE_HOST");
+//        if (testsSystem == null) {
+//            System.out.println("Test system not available. Restarting");
+//            System.exit(1);
+//        }
 
         SpringApplication.run(App.class, args);
     }
@@ -53,9 +53,6 @@ public class App extends RouteBuilder {
         KubernetesClusterService kubernetes;
         if (mode.equals("DEFAULT")) {
             kubernetes = new KubernetesClusterService();
-        } else if (mode.equals("RECREATING")) {
-            kubernetes = new KubernetesClusterService();
-            kubernetes.setWatchRefreshIntervalSeconds(20L);
         } else {
             throw new IllegalStateException("Unsupported mode: " + mode);
         }

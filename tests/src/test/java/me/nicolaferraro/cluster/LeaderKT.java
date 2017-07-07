@@ -15,9 +15,6 @@
  */
 package me.nicolaferraro.cluster;
 
-import io.fabric8.kubernetes.api.model.v2_2.EnvVar;
-import io.fabric8.kubernetes.api.model.v2_2.EnvVarBuilder;
-
 import org.jboss.arquillian.junit.Arquillian;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,11 +33,11 @@ public class LeaderKT extends KubernetesTestBase {
     private static final double FORCEFUL_KILL_PROB = 0.35;
 
 
-    @Test
-    public void recreatingSystemTest() throws Exception {
-        setEnv("MODE", "RECREATING");
-        doTest();
-    }
+//    @Test
+//    public void recreatingSystemTest() throws Exception {
+//        setEnv("MODE", "RECREATING");
+//        doTest();
+//    }
 
     @Test
     public void defaultSystemTest() throws Exception {
